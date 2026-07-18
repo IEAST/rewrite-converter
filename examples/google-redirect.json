@@ -1,0 +1,32 @@
+{
+  "name": "Google Redirect",
+  "description": "Redirect Google China search domains to google.com",
+  "author": "Example",
+  "homepage": "",
+  "rewrites": [
+    {
+      "pattern": "^https?:\\/\\/(www\\.)?(g|google)\\.cn",
+      "action": "redirect",
+      "tag": "Google Redirect",
+      "status": 302,
+      "target": "https://www.google.com",
+      "reject_type": null,
+      "script": null,
+      "requires_body": false,
+      "timeout": 30,
+      "enabled": true,
+      "source_line": null
+    }
+  ],
+  "mitm": {
+    "hostnames": [
+      "g.cn",
+      "google.cn",
+      "www.g.cn",
+      "www.google.cn"
+    ],
+    "skip_server_cert_verify": false
+  },
+  "warnings": []
+}
+
