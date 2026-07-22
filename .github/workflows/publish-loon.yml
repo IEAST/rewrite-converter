@@ -1,0 +1,72 @@
+name: Publish Loon plugins
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - ".github/workflows/publish-loon.yml"
+  schedule:
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-loon
+  cancel-in-progress: true
+
+env:
+  UPSTREAM_REPOSITORY: ddgksf2013/Rewrite
+  UPSTREAM_REF: master
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Run tests
+        run: PYTHONPATH=src python -m unittest discover -s tests -v
+
+      - name: Check out QX upstream
+        run: |
+          git clone --depth 1 --branch "$UPSTREAM_REF" \
+            "https://github.com/$UPSTREAM_REPOSITORY.git" \
+            "$RUNNER_TEMP/qx-upstream"
+          git -C "$RUNNER_TEMP/qx-upstream" rev-parse HEAD > "$RUNNER_TEMP/upstream-sha"
+
+      - name: Generate Loon plugins
+        run: |
+          mkdir -p "$RUNNER_TEMP/loon-plugins"
+          PYTHONPATH=src python -m rewrite_converter generate-loon-tree \
+            "$RUNNER_TEMP/qx-upstream" \
+            -o "$RUNNER_TEMP/loon-plugins" \
+            --quarantine-unsupported \
+            --report "$RUNNER_TEMP/loon-plugins/_compatibility.json"
+          upstream_sha=$(cat "$RUNNER_TEMP/upstream-sha")
+          printf 'repository=%s\nref=%s\ncommit=%s\n' \
+            "$UPSTREAM_REPOSITORY" "$UPSTREAM_REF" "$upstream_sha" \
+            > "$RUNNER_TEMP/loon-plugins/_source.txt"
+
+      - name: Publish generated branch
+        run: |
+          upstream_sha=$(cat "$RUNNER_TEMP/upstream-sha")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git clean -fdx
+          git switch --orphan loon
+          cp -R "$RUNNER_TEMP/loon-plugins/." .
+          touch .nojekyll
+          git add .
+          git commit -m "Generate Loon plugins from $upstream_sha"
+          git push --force origin loon

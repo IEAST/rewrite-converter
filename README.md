@@ -259,7 +259,53 @@ QX 和 Loon 可以生成对应语法。Shadowrocket 暂无经过验证的等价�
 
 自动转换器可以证明结构和已知语法，但不能替代设备上的行为验证。
 
-## 13. 项目结构
+## 13. 自动发布 Loon 插件
+
+GitHub Actions 默认跟踪 `ddgksf2013/Rewrite` 的 `master` 分支。上游仓库和分支配置位于
+`.github/workflows/publish-loon.yml` 的 `UPSTREAM_REPOSITORY`、`UPSTREAM_REF`。
+
+Action 会在相关代码推送、手动运行以及每日定时任务中：
+
+1. 运行测试；
+2. 浅克隆上游仓库；
+3. 导入上游所有 `.conf`；
+4. 针对 Loon 校验转换结果；
+5. 将 `.plugin` 文件发布到独立的 `loon` 分支。
+
+上游目录和基本文件名会被保留。例如：
+
+```text
+上游：AdBlock/AmapAds.conf
+                 ↓
+loon 分支：AdBlock/AmapAds.plugin
+```
+
+发布分支中的 `_source.txt` 记录生成时使用的上游仓库、分支和 commit。
+`_compatibility.json` 按来源文件记录：
+
+- Parser 无法转换成中间模型的 QX 行；
+- 目标校验不支持、因而从输出中剔除的规则；
+- 仍需人工或真机确认的 warning；
+- 对应文件是否生成。
+
+自动发布采用文件隔离模式：系统逐行检测兼容性，但只要一个文件中存在无法转换的行或规则，
+整个文件就不会发布。问题仍按具体行写入兼容性报告。这里没有按上游文件名维护静态排除清单，
+因此更换上游仓库后不需要预先列举不兼容文件。如果希望本地审计时只要出现一个不兼容文件
+就让命令失败，省略 `--quarantine-unsupported` 即可。
+
+公开仓库中的插件可以在 Loon 中使用 raw URL 导入：
+
+```text
+https://raw.githubusercontent.com/<OWNER>/<REPOSITORY>/loon/ads/example.plugin
+```
+
+也可以在 Loon 中打开以下链接导入插件，其中 `<ENCODED_RAW_URL>` 是经过 URL 编码的上述 raw URL：
+
+```text
+loon://import?plugin=<ENCODED_RAW_URL>
+```
+
+## 14. 项目结构
 
 ```text
 src/rewrite_converter/
@@ -275,7 +321,7 @@ src/rewrite_converter/
     └── shadowrocket.py
 ```
 
-## 14. 下一阶段建议
+## 15. 下一阶段建议
 
 推荐按以下顺序扩展：
 

@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
+from rewrite_converter.cli import main
 from rewrite_converter.model import Action
 from rewrite_converter.parsers.quantumultx import parse_text
 
@@ -52,6 +57,61 @@ hostname = google.cn, api.example
         )
         self.assertEqual(Action.JSON_JQ_RESPONSE, manifest.rewrites[0].action)
         self.assertEqual("'del(.ads)'", manifest.rewrites[0].expression)
+
+    def test_generate_loon_tree_preserves_relative_paths(self) -> None:
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "inputs" / "nested" / "demo.conf"
+            source.parent.mkdir(parents=True)
+            source.write_text("^https://example\\.com url reject-200\n", encoding="utf-8")
+
+            with redirect_stdout(StringIO()):
+                status = main(["generate-loon-tree", str(root / "inputs"), "-o", str(root / "output")])
+
+            self.assertEqual(0, status)
+            plugin = root / "output" / "nested" / "demo.plugin"
+            self.assertTrue(plugin.exists())
+            self.assertIn("[URL Rewrite]", plugin.read_text(encoding="utf-8"))
+
+    def test_generate_loon_tree_rejects_unsupported_lines(self) -> None:
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "inputs" / "bad.conf"
+            source.parent.mkdir(parents=True)
+            source.write_text("^https://example\\.com url request-header add Foo Bar\n", encoding="utf-8")
+
+            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                status = main(["generate-loon-tree", str(root / "inputs"), "-o", str(root / "output")])
+
+            self.assertEqual(1, status)
+            self.assertFalse((root / "output" / "bad.plugin").exists())
+
+    def test_generate_loon_tree_quarantines_entire_unsupported_file(self) -> None:
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "inputs" / "nested" / "mixed.conf"
+            source.parent.mkdir(parents=True)
+            source.write_text("^good url reject-200\n^bad url unsupported\n", encoding="utf-8")
+            report = root / "report.json"
+
+            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                status = main(
+                    [
+                        "generate-loon-tree",
+                        str(root / "inputs"),
+                        "-o",
+                        str(root / "output"),
+                        "--quarantine-unsupported",
+                        "--report",
+                        str(report),
+                    ]
+                )
+
+            self.assertEqual(0, status)
+            plugin = root / "output" / "nested" / "mixed.plugin"
+            self.assertFalse(plugin.exists())
+            self.assertIn("unsupported rewrite syntax", report.read_text(encoding="utf-8"))
+            self.assertIn('"generated": false', report.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
