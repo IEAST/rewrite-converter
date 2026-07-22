@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import re
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -39,6 +41,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="skip files containing unsupported rules and record them instead of failing",
     )
     publish_loon.add_argument("--report", type=Path, help="write a JSON compatibility report")
+    publish_loon.add_argument(
+        "--allowlist",
+        type=Path,
+        help="JSON mapping source paths to approved compatibility fingerprints",
+    )
 
     generate = sub.add_parser("generate", help="generate a client configuration from JSON")
     generate.add_argument("input", type=Path)
@@ -83,6 +90,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.output_dir,
                 quarantine_unsupported=args.quarantine_unsupported,
                 report_path=args.report,
+                allowlist_path=args.allowlist,
             )
         if args.command == "generate":
             manifest = load_manifest(args.input)
@@ -125,6 +133,7 @@ def _generate_loon_tree(
     *,
     quarantine_unsupported: bool = False,
     report_path: Path | None = None,
+    allowlist_path: Path | None = None,
 ) -> int:
     files = sorted(input_dir.rglob("*.conf"))
     if not files:
@@ -132,6 +141,7 @@ def _generate_loon_tree(
 
     failed = False
     report: list[dict[str, object]] = []
+    allowlist = _load_allowlist(allowlist_path)
     for source in files:
         source_relative = source.relative_to(input_dir)
         manifest = parse_file(source)
@@ -147,6 +157,17 @@ def _generate_loon_tree(
             item for item in diagnostics if item.level == "error" and item.rule_index is None
         ]
         validation_warnings = [item for item in diagnostics if item.level == "warning"]
+        blocking_issues = [
+            _parser_issue(warning) for warning in manifest.warnings
+        ] + [
+            _rule_issue(manifest, diagnostics, index) for index in sorted(rule_errors)
+        ]
+        approved_fingerprints = allowlist.get(source_relative.as_posix(), set())
+        all_blocking_issues_approved = bool(blocking_issues) and all(
+            issue["fingerprint"] in approved_fingerprints for issue in blocking_issues
+        )
+        for issue in blocking_issues:
+            issue["allowed"] = issue["fingerprint"] in approved_fingerprints
 
         entry: dict[str, object] = {
             "source": source_relative.as_posix(),
@@ -165,13 +186,18 @@ def _generate_loon_tree(
             ],
             "manifest_errors": [item.message for item in manifest_errors],
             "validation_warnings": [item.message for item in validation_warnings],
+            "blocking_issues": blocking_issues,
+            "allowlisted": all_blocking_issues_approved,
             "generated": False,
         }
         if manifest.warnings or rule_errors or validation_warnings or manifest_errors:
             report.append(entry)
 
         for warning in manifest.warnings:
-            level = "QUARANTINED" if quarantine_unsupported else "ERROR"
+            if all_blocking_issues_approved:
+                level = "ALLOWLISTED"
+            else:
+                level = "QUARANTINED" if quarantine_unsupported else "ERROR"
             print(f"{level}: {source}: {warning}", file=sys.stderr)
         for diagnostic in diagnostics:
             print(f"{source}: {diagnostic.render()}")
@@ -181,14 +207,27 @@ def _generate_loon_tree(
             failed = True
             continue
         if has_unsupported:
-            if not quarantine_unsupported:
-                failed = True
-            print(f"SKIPPED: {source_relative} (file contains unsupported rules)")
-            continue
+            if not all_blocking_issues_approved:
+                if not quarantine_unsupported:
+                    failed = True
+                print(f"SKIPPED: {source_relative} (file contains unapproved rules)")
+                continue
 
-        compatible_manifest = replace(manifest, warnings=[])
+        compatible_manifest = replace(
+            manifest,
+            rewrites=[
+                rule for index, rule in enumerate(manifest.rewrites) if index not in rule_errors
+            ],
+            warnings=[],
+        )
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(get_emitter("loon")(compatible_manifest), encoding="utf-8")
+        output = get_emitter("loon")(compatible_manifest)
+        if all_blocking_issues_approved:
+            output = (
+                "# WARNING: compatibility exceptions were manually approved; "
+                "see _compatibility.json.\n" + output
+            )
+        destination.write_text(output, encoding="utf-8")
         entry["generated"] = True
         print(f"WROTE: {destination}")
 
@@ -199,6 +238,63 @@ def _generate_loon_tree(
             encoding="utf-8",
         )
     return 1 if failed else 0
+
+
+def _load_allowlist(path: Path | None) -> dict[str, set[str]]:
+    if path is None:
+        return {}
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError("Compatibility allowlist root must be a JSON object")
+    result: dict[str, set[str]] = {}
+    for source, fingerprints in value.items():
+        if not isinstance(source, str) or not isinstance(fingerprints, list) or not all(
+            isinstance(item, str) for item in fingerprints
+        ):
+            raise ValueError("Compatibility allowlist must map source paths to string lists")
+        result[source] = set(fingerprints)
+    return result
+
+
+def _parser_issue(warning: str) -> dict[str, object]:
+    match = re.match(r"line (?P<line>\d+): (?P<message>.*)", warning)
+    source_line = int(match["line"]) if match else None
+    message = match["message"] if match else warning
+    return {
+        "kind": "parser_warning",
+        "source_line": source_line,
+        "message": message,
+        "fingerprint": _fingerprint("parser_warning", message),
+    }
+
+
+def _rule_issue(manifest, diagnostics, index: int) -> dict[str, object]:
+    messages = sorted(
+        item.message
+        for item in diagnostics
+        if item.level == "error" and item.rule_index == index
+    )
+    rule = manifest.rewrites[index]
+    identity = json.dumps(
+        {
+            "pattern": rule.pattern,
+            "action": rule.action.value,
+            "messages": messages,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    return {
+        "kind": "rule_error",
+        "source_line": rule.source_line,
+        "message": "; ".join(messages),
+        "fingerprint": _fingerprint("rule_error", identity),
+    }
+
+
+def _fingerprint(kind: str, value: str) -> str:
+    digest = hashlib.sha256(f"{kind}\0{value}".encode("utf-8")).hexdigest()
+    return f"sha256:{digest}"
 
 
 def _print_import_warnings(warnings: list[str]) -> None:

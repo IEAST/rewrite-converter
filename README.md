@@ -293,6 +293,24 @@ loon 分支：AdBlock/AmapAds.plugin
 因此更换上游仓库后不需要预先列举不兼容文件。如果希望本地审计时只要出现一个不兼容文件
 就让命令失败，省略 `--quarantine-unsupported` 即可。
 
+### 手工放行兼容性问题
+
+`_compatibility.json` 中每个阻断项都有稳定的 `fingerprint`。确认某个问题不影响使用后，将该
+fingerprint 加入 `.github/compatibility-allowlist.json` 中对应的上游相对路径：
+
+```json
+{
+  "AdBlock/Example.conf": [
+    "sha256:从兼容性报告复制的指纹"
+  ]
+}
+```
+
+只有文件当前的所有阻断项都被逐项放行时，Action 才会发布其兼容部分。放行绑定的是具体问题
+内容而不是行号：上游只移动行号不会失效，但规则内容发生变化或增加新的不兼容项时，该文件会
+重新进入隔离状态。手工放行的插件顶部会带有 warning 注释，报告中的 `allowlisted` 也会标记为
+`true`。
+
 公开仓库中的插件可以在 Loon 中使用 raw URL 导入：
 
 ```text

@@ -7,6 +7,8 @@ on:
       - "src/**"
       - "tests/**"
       - "pyproject.toml"
+      - ".github/compatibility-allowlist.json"
+      - ".github/loon-branch-README.md"
       - ".github/workflows/publish-loon.yml"
   schedule:
     - cron: "0 20 * * *"
@@ -52,7 +54,9 @@ jobs:
             "$RUNNER_TEMP/qx-upstream" \
             -o "$RUNNER_TEMP/loon-plugins" \
             --quarantine-unsupported \
+            --allowlist .github/compatibility-allowlist.json \
             --report "$RUNNER_TEMP/loon-plugins/_compatibility.json"
+          cp .github/loon-branch-README.md "$RUNNER_TEMP/loon-plugins/README.md"
           upstream_sha=$(cat "$RUNNER_TEMP/upstream-sha")
           printf 'repository=%s\nref=%s\ncommit=%s\n' \
             "$UPSTREAM_REPOSITORY" "$UPSTREAM_REF" "$upstream_sha" \

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
@@ -112,6 +113,83 @@ hostname = google.cn, api.example
             self.assertFalse(plugin.exists())
             self.assertIn("unsupported rewrite syntax", report.read_text(encoding="utf-8"))
             self.assertIn('"generated": false', report.read_text(encoding="utf-8"))
+
+    def test_generate_loon_tree_publishes_only_exactly_allowlisted_issues(self) -> None:
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "inputs" / "nested" / "mixed.conf"
+            source.parent.mkdir(parents=True)
+            source.write_text("^good url reject-200\n^bad url unsupported\n", encoding="utf-8")
+            first_report = root / "first-report.json"
+
+            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                main(
+                    [
+                        "generate-loon-tree",
+                        str(root / "inputs"),
+                        "-o",
+                        str(root / "first-output"),
+                        "--quarantine-unsupported",
+                        "--report",
+                        str(first_report),
+                    ]
+                )
+            fingerprint = json.loads(first_report.read_text(encoding="utf-8"))[0][
+                "blocking_issues"
+            ][0]["fingerprint"]
+            allowlist = root / "allowlist.json"
+            allowlist.write_text(
+                json.dumps({"nested/mixed.conf": [fingerprint]}),
+                encoding="utf-8",
+            )
+            second_report = root / "second-report.json"
+
+            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                status = main(
+                    [
+                        "generate-loon-tree",
+                        str(root / "inputs"),
+                        "-o",
+                        str(root / "second-output"),
+                        "--quarantine-unsupported",
+                        "--allowlist",
+                        str(allowlist),
+                        "--report",
+                        str(second_report),
+                    ]
+                )
+
+            self.assertEqual(0, status)
+            plugin = root / "second-output" / "nested" / "mixed.plugin"
+            output = plugin.read_text(encoding="utf-8")
+            self.assertIn("compatibility exceptions were manually approved", output)
+            self.assertIn("^good reject-200", output)
+            self.assertNotIn("^bad", output)
+            self.assertTrue(json.loads(second_report.read_text(encoding="utf-8"))[0]["allowlisted"])
+
+            source.write_text(
+                "^good url reject-200\n^bad url unsupported\n^new url unsupported-too\n",
+                encoding="utf-8",
+            )
+            third_report = root / "third-report.json"
+            with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+                status = main(
+                    [
+                        "generate-loon-tree",
+                        str(root / "inputs"),
+                        "-o",
+                        str(root / "third-output"),
+                        "--quarantine-unsupported",
+                        "--allowlist",
+                        str(allowlist),
+                        "--report",
+                        str(third_report),
+                    ]
+                )
+
+            self.assertEqual(0, status)
+            self.assertFalse((root / "third-output" / "nested" / "mixed.plugin").exists())
+            self.assertFalse(json.loads(third_report.read_text(encoding="utf-8"))[0]["allowlisted"])
 
 
 if __name__ == "__main__":
