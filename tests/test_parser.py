@@ -72,7 +72,9 @@ hostname = google.cn, api.example
             self.assertEqual(0, status)
             plugin = root / "output" / "nested" / "demo.plugin"
             self.assertTrue(plugin.exists())
-            self.assertIn("[URL Rewrite]", plugin.read_text(encoding="utf-8"))
+            output = plugin.read_text(encoding="utf-8")
+            self.assertIn("[Rewrite]", output)
+            self.assertNotIn("[URL Rewrite]", output)
 
     def test_generate_loon_tree_rejects_unsupported_lines(self) -> None:
         with TemporaryDirectory() as temporary:

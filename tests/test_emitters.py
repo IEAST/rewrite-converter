@@ -38,7 +38,8 @@ class EmitterTests(unittest.TestCase):
 
     def test_loon_output(self) -> None:
         output = emit_loon(example())
-        self.assertIn("[URL Rewrite]", output)
+        self.assertIn("[Rewrite]", output)
+        self.assertNotIn("[URL Rewrite]", output)
         self.assertIn(" 302 https://www.google.com", output)
         self.assertIn("http-response ", output)
         self.assertIn("requires-body=true", output)
@@ -52,4 +53,3 @@ class EmitterTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

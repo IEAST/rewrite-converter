@@ -25,7 +25,7 @@ def emit(manifest: Manifest) -> str:
         else:
             rewrite_lines.append(_rewrite(rule))
 
-    lines.extend(["", "[URL Rewrite]"])
+    lines.extend(["", "[Rewrite]"])
     lines.extend(rewrite_lines)
     lines.extend(["", "[Script]"])
     lines.extend(script_lines)
