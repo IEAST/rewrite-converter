@@ -1,0 +1,102 @@
+[
+  {
+    "source": "AdBlock/Applet.conf",
+    "parser_warnings": [
+      "line 33: unsupported rewrite syntax: ^(http|https):\\/\\/mp\\.weixin\\.qq\\.com\\/mp\\/getappmsgad url response-body advertisement response-body ddgksf2013"
+    ],
+    "dropped_rules": [],
+    "manifest_errors": [],
+    "validation_warnings": [],
+    "blocking_issues": [
+      {
+        "kind": "parser_warning",
+        "source_line": 33,
+        "message": "unsupported rewrite syntax: ^(http|https):\\/\\/mp\\.weixin\\.qq\\.com\\/mp\\/getappmsgad url response-body advertisement response-body ddgksf2013",
+        "fingerprint": "sha256:8e96b1022b78f32d4f085f332bfeada12b7f6cf03bdbd145a70f6efec78fd623",
+        "allowed": true
+      }
+    ],
+    "allowlisted": true,
+    "generated": true
+  },
+  {
+    "source": "AdBlock/WeChat.conf",
+    "parser_warnings": [
+      "line 14: unsupported rewrite syntax: ^https?:\\/\\/mp\\.weixin\\.qq\\.com\\/mp\\/getappmsgad url response-body advertisement response-body ddgksf2013"
+    ],
+    "dropped_rules": [],
+    "manifest_errors": [],
+    "validation_warnings": [],
+    "blocking_issues": [
+      {
+        "kind": "parser_warning",
+        "source_line": 14,
+        "message": "unsupported rewrite syntax: ^https?:\\/\\/mp\\.weixin\\.qq\\.com\\/mp\\/getappmsgad url response-body advertisement response-body ddgksf2013",
+        "fingerprint": "sha256:57319788dcac62867786cb5a5f2201717b767780d9381f0539e1ed22a1bd276c",
+        "allowed": false
+      }
+    ],
+    "allowlisted": false,
+    "generated": false
+  },
+  {
+    "source": "AdBlock/YoutubeAds.conf",
+    "parser_warnings": [],
+    "dropped_rules": [],
+    "manifest_errors": [],
+    "validation_warnings": [
+      "negative MITM hostnames require manual verification in Loon: -redirector*.googlevideo.com"
+    ],
+    "blocking_issues": [],
+    "allowlisted": false,
+    "generated": true
+  },
+  {
+    "source": "Function/EmbyPlugin.conf",
+    "parser_warnings": [
+      "line 23: unsupported rewrite syntax: \\/plugin\\/scheme url script-echo-response https://raw.githubusercontent.com/rartv/EmbyPublic/refs/heads/test/surge/emby-plugin.js",
+      "line 29: unsupported rewrite syntax: \\/Users\\/\\w{32}\\/Items\\/\\d+\\? url request-header (\\r\\n)Accept-Encoding:.+ request-header $Accept-Encoding: gzip, deflate, br"
+    ],
+    "dropped_rules": [],
+    "manifest_errors": [],
+    "validation_warnings": [],
+    "blocking_issues": [
+      {
+        "kind": "parser_warning",
+        "source_line": 23,
+        "message": "unsupported rewrite syntax: \\/plugin\\/scheme url script-echo-response https://raw.githubusercontent.com/rartv/EmbyPublic/refs/heads/test/surge/emby-plugin.js",
+        "fingerprint": "sha256:ca92ec2b5f0e53b70e84ec562ef81a9b1b6eb5527b5df59ac0bff872f35e37af",
+        "allowed": false
+      },
+      {
+        "kind": "parser_warning",
+        "source_line": 29,
+        "message": "unsupported rewrite syntax: \\/Users\\/\\w{32}\\/Items\\/\\d+\\? url request-header (\\r\\n)Accept-Encoding:.+ request-header $Accept-Encoding: gzip, deflate, br",
+        "fingerprint": "sha256:60921463db6e620c24d6896c44cac59e6513d276c93cc983b82041fe6b32211d",
+        "allowed": false
+      }
+    ],
+    "allowlisted": false,
+    "generated": false
+  },
+  {
+    "source": "Function/TFDownload.conf",
+    "parser_warnings": [
+      "line 14: unsupported rewrite syntax: ^https?:\\/\\/testflight\\.apple\\.com\\/v2\\/accounts\\/.*\\/apps\\/\\d*/builds/\\d*/install url request-body storefrontId\" : \".*\" request-body storefrontId\" : \"143441-1,29\""
+    ],
+    "dropped_rules": [],
+    "manifest_errors": [],
+    "validation_warnings": [],
+    "blocking_issues": [
+      {
+        "kind": "parser_warning",
+        "source_line": 14,
+        "message": "unsupported rewrite syntax: ^https?:\\/\\/testflight\\.apple\\.com\\/v2\\/accounts\\/.*\\/apps\\/\\d*/builds/\\d*/install url request-body storefrontId\" : \".*\" request-body storefrontId\" : \"143441-1,29\"",
+        "fingerprint": "sha256:93387832bcc623e8826e624a826612d090c98b394bc26fde8be8c911fad80e34",
+        "allowed": false
+      }
+    ],
+    "allowlisted": false,
+    "generated": false
+  }
+]
